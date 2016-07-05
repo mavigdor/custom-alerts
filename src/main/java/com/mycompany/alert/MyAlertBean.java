@@ -7,6 +7,7 @@ import org.openspaces.admin.alert.AlertSeverity;
 import org.openspaces.admin.alert.AlertStatus;
 import org.openspaces.admin.internal.alert.InternalAlertManager;
 import org.openspaces.admin.internal.alert.bean.AlertBean;
+import org.openspaces.admin.internal.alert.bean.util.AlertBeanUtils;
 import org.openspaces.admin.machine.Machine;
 import org.openspaces.admin.machine.events.MachineLifecycleEventListener;
 
@@ -14,11 +15,14 @@ import java.util.Map;
 
 /**
  * Created by moran on 6/11/16.
+ * @version 2.0
+ * @since 12.0.0
  */
 public class MyAlertBean implements AlertBean, MachineLifecycleEventListener {
 
     private Admin admin;
     private Map<String, String> properties;
+    private final String UID = AlertBeanUtils.generateBeanUUID(this.getClass());
 
     public MyAlertBean() {
         System.out.println("My Alert Bean enabled");
@@ -43,10 +47,6 @@ public class MyAlertBean implements AlertBean, MachineLifecycleEventListener {
     @Override
     public void afterPropertiesSet() throws Exception {
         admin.getMachines().addLifecycleListener(this);
-        int size = admin.getMachines().getSize();
-        if (size == 0) {
-            raiseAlert();
-        }
     }
 
     @Override
@@ -63,15 +63,12 @@ public class MyAlertBean implements AlertBean, MachineLifecycleEventListener {
     }
 
     private void resolveAlert(Machine machine) {
-        Alert[] alertsByGroupUid = ((InternalAlertManager)admin.getAlertManager()).getAlertRepository().getAlertsByGroupUid("localhost");
-        if (alertsByGroupUid.length != 0 && ! alertsByGroupUid[0].getStatus().isResolved()) {
-            AlertFactory f = new AlertFactory();
+        if (admin.getAlertManager().getAlertStatusByGroupId(UID).isUnresolved()) {
+            AlertFactory f = new AlertFactory(UID, AlertSeverity.WARNING, AlertStatus.RESOLVED);
             f.name("machine size alert");
             f.description("Machine " + machine.getHostName() + " is available");
-            f.groupUid("localhost");
-            f.severity(AlertSeverity.WARNING);
-            f.status(AlertStatus.RESOLVED);
-            admin.getAlertManager().triggerAlert(f.toAlert());
+
+            admin.getAlertManager().triggerAlert(f.create());
         }
     }
 
@@ -84,12 +81,10 @@ public class MyAlertBean implements AlertBean, MachineLifecycleEventListener {
     }
 
     private void raiseAlert() {
-        AlertFactory f = new AlertFactory();
+        AlertFactory f = new AlertFactory(UID, AlertSeverity.WARNING, AlertStatus.RAISED);
         f.name("machine size alert");
         f.description("alerts when no machines are available");
-        f.groupUid("localhost");
-        f.severity(AlertSeverity.WARNING);
-        f.status(AlertStatus.RAISED);
-        admin.getAlertManager().triggerAlert(f.toAlert());
+
+        admin.getAlertManager().triggerAlert(f.create());
     }
 }
